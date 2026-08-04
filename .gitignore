@@ -1,15 +1,52 @@
-# Rust build artifacts
+# Rust build and release artifacts
 /target/
+/artifacts/
+/package/
+/packages/
+/staging/
+/.package-*/
 
 # Cargo lock (optional for binaries, included by default)
 # Cargo.lock
 
-# Debug/log files
+# Compiled output created outside Cargo target directories
+*.exe
+*.pdb
+
+# Logs, diagnostics, and temporary files
 *.log
+*.dmp
+*.diag
+*.tmp
+*.temp
+*.bak
+*.old
+*.orig
+*.ps1.tmp
+*.tmp.ps1
+/diagnostics/
+
+# Local settings and credential material
+settings.json
+.credentials.json
+auth.json
+credentials.json
+credentials.dat
+secrets.json
+*.token
+.env
+.env.*
+*.pem
+*.pfx
+*.p12
+*.key
 
 # IDE
+.vs/
 .idea/
 .vscode/
+*.user
+*.suo
 *.swp
 *.swo
 *~
@@ -24,3 +61,4 @@ workflow.cmd
 
 # Local WinGet manifest generation output
 /manifests/
+/winget-manifests/

@@ -1,0 +1,80 @@
+name: Feature request
+description: Suggest a focused improvement for Codex Usage Monitor
+title: '[Feature]: '
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Describe the user problem and desired result. Do not include tokens, credential contents, authentication files, or personal data.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What limitation or workflow problem should be addressed?
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposed-result
+    attributes:
+      label: Proposed result
+      description: Describe observable behavior and acceptance criteria, not only an implementation.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: affected-providers
+    attributes:
+      label: Affected providers
+      options:
+        - label: Codex
+        - label: Claude Code
+        - label: Google Antigravity
+        - label: Provider-independent
+    validations:
+      required: true
+
+  - type: textarea
+    id: ui-impact
+    attributes:
+      label: UI impact
+      description: Describe effects on widget size, taskbar placement, tray icons, menus, themes, DPI, or localization.
+    validations:
+      required: true
+
+  - type: textarea
+    id: privacy-security-impact
+    attributes:
+      label: Privacy and security impact
+      description: Identify new credentials, stores, endpoints, logs, downloads, or file operations, or state that there are none.
+    validations:
+      required: true
+
+  - type: textarea
+    id: delivery-impact
+    attributes:
+      label: Portable and WinGet impact
+      description: Describe compatibility with raw EXE, ZIP, portable update, and WinGet installation, or state that there is no impact.
+    validations:
+      required: true
+
+  - type: textarea
+    id: additional-context
+    attributes:
+      label: Additional context
+
+  - type: checkboxes
+    id: confirmation
+    attributes:
+      label: Confirmation
+      options:
+        - label: This request contains no secrets, credential contents, or personal data.
+          required: true

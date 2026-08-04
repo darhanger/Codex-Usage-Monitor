@@ -1,0 +1,183 @@
+name: Bug report
+description: Report a reproducible Codex Usage Monitor problem
+title: '[Bug]: '
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for helping improve Codex Usage Monitor.
+
+        **Do not publish tokens, credential contents, authentication files, personal paths, or unsanitized diagnostic logs. Security vulnerabilities must use a private Security Advisory.**
+
+  - type: input
+    id: application-version
+    attributes:
+      label: Application version
+      description: Use the version shown in the menu or executable properties.
+      placeholder: 0.2.1 or commit SHA
+    validations:
+      required: true
+
+  - type: dropdown
+    id: installation-method
+    attributes:
+      label: Installation method
+      options:
+        - Portable EXE
+        - Portable ZIP
+        - WinGet
+    validations:
+      required: true
+
+  - type: input
+    id: windows-version
+    attributes:
+      label: Windows version and build
+      description: Include Windows 10 or 11, edition, and OS build number.
+      placeholder: Windows 11 Pro 24H2, build 26100.x
+    validations:
+      required: true
+
+  - type: dropdown
+    id: system-architecture
+    attributes:
+      label: System architecture
+      options:
+        - x64
+        - ARM64 using x64 emulation
+        - Other or unknown
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: enabled-providers
+    attributes:
+      label: Enabled providers
+      description: Select every provider enabled when the problem occurs.
+      options:
+        - label: Codex
+        - label: Claude Code
+        - label: Google Antigravity
+    validations:
+      required: true
+
+  - type: dropdown
+    id: codex-installation
+    attributes:
+      label: Codex installation type
+      options:
+        - Not enabled
+        - Standalone Codex CLI
+        - VS Code extension
+        - VS Code Insiders or VS Code OSS extension
+        - Cursor extension
+        - Windsurf extension
+        - Other or unknown
+    validations:
+      required: true
+
+  - type: dropdown
+    id: claude-environment
+    attributes:
+      label: Claude Code environment
+      options:
+        - Not enabled
+        - Windows
+        - WSL
+        - Both Windows and WSL
+        - Other or unknown
+    validations:
+      required: true
+
+  - type: input
+    id: monitors
+    attributes:
+      label: Monitor configuration
+      description: Include monitor count, resolution, scaling, and relative arrangement.
+      placeholder: Two monitors; 2560x1440 at 125% primary, 1920x1080 at 100% secondary
+    validations:
+      required: true
+
+  - type: dropdown
+    id: taskbar-position
+    attributes:
+      label: Taskbar location
+      options:
+        - Primary monitor taskbar
+        - Secondary monitor taskbar
+        - Multiple taskbars affected
+        - Top, left, or right taskbar
+        - Other or unknown
+    validations:
+      required: true
+
+  - type: dropdown
+    id: windows-theme
+    attributes:
+      label: Windows theme
+      options:
+        - Light
+        - Dark
+        - Custom or mixed
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Provide the smallest deterministic sequence that reproduces the problem.
+      placeholder: |
+        1. Start ...
+        2. Select ...
+        3. Observe ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true
+
+  - type: textarea
+    id: diagnostic-log
+    attributes:
+      label: Sanitized diagnostic log
+      description: Include only relevant lines after removing tokens, account data, user names, WSL names, and personal paths.
+      render: text
+
+  - type: textarea
+    id: screenshots
+    attributes:
+      label: Screenshots
+      description: Drag screenshots here only after checking every visible area for personal information.
+
+  - type: textarea
+    id: additional-context
+    attributes:
+      label: Additional context
+
+  - type: checkboxes
+    id: confirmations
+    attributes:
+      label: Required confirmations
+      options:
+        - label: I tested the latest published release.
+          required: true
+        - label: I can reproduce this problem.
+          required: true
+        - label: This report contains no tokens or credential contents.
+          required: true
+        - label: Any diagnostic log is sanitized of personal data and local secrets.
+          required: true
+        - label: This is not a security vulnerability.
+          required: true

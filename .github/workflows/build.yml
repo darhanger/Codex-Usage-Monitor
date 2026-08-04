@@ -1,0 +1,295 @@
+name: Build
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  ARTIFACT_NAME: CodexUsageMonitor-Windows-x64
+  WINGET_PACKAGE_ID: DarhangeR.CodexUsageMonitor
+  RELEASE_ASSET_NAME: codex-usage-monitor.exe
+
+jobs:
+  build-windows:
+    name: Build and test Windows x64
+    runs-on: windows-2022
+    timeout-minutes: 45
+
+    defaults:
+      run:
+        shell: pwsh
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Install stable Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Cache Cargo registry, git dependencies, and target
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+
+      - name: Run Clippy
+        run: cargo clippy --all-targets --locked -- -D warnings
+
+      - name: Run tests
+        run: cargo test --all-targets --locked
+
+      - name: Build Release
+        run: cargo build --release --locked
+
+      - name: Create and verify portable package
+        run: >-
+          ./scripts/package.ps1
+          -BuildDirectory target
+          -Configuration Release
+          -OutputDirectory artifacts
+
+      - name: Upload Windows x64 artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ env.ARTIFACT_NAME }}
+          path: |
+            artifacts/codex-usage-monitor.exe
+            artifacts/codex-usage-monitor.exe.sha256
+            artifacts/CodexUsageMonitor-*-Windows-x64.zip
+            artifacts/CodexUsageMonitor-*-Windows-x64.zip.sha256
+          if-no-files-found: error
+          retention-days: 14
+
+  publish-release:
+    name: Publish versioned GitHub Release
+    needs: build-windows
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: windows-2022
+    timeout-minutes: 15
+
+    permissions:
+      actions: read
+      contents: write
+
+    outputs:
+      version: ${{ steps.release-metadata.outputs.version }}
+      tag: ${{ steps.release-metadata.outputs.tag }}
+
+    defaults:
+      run:
+        shell: pwsh
+
+    steps:
+      - name: Checkout tested commit
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Install stable Rust for metadata validation
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Download tested Windows x64 artifact
+        uses: actions/download-artifact@v8
+        with:
+          name: ${{ env.ARTIFACT_NAME }}
+          path: artifacts
+
+      - name: Validate downloaded release assets
+        run: ./scripts/verify-release.ps1 -OutputDirectory artifacts
+
+      - name: Resolve release metadata
+        id: release-metadata
+        run: |
+          $metadataJson = & cargo metadata --no-deps --locked --format-version 1
+          if ($LASTEXITCODE -ne 0) {
+            throw "cargo metadata failed with exit code $LASTEXITCODE."
+          }
+          $metadata = ($metadataJson -join [System.Environment]::NewLine) | ConvertFrom-Json
+          $manifestPath = [System.IO.Path]::GetFullPath('Cargo.toml')
+          $packages = @($metadata.packages | Where-Object {
+            [System.IO.Path]::GetFullPath($_.manifest_path) -eq $manifestPath
+          })
+          if ($packages.Count -ne 1) {
+            throw "Expected exactly one root Cargo package, found $($packages.Count)."
+          }
+
+          $version = [string]$packages[0].version
+          if ($version -notmatch '^\d+\.\d+\.\d+$') {
+            throw "Release version must use MAJOR.MINOR.PATCH: $version"
+          }
+
+          $archive = "artifacts/CodexUsageMonitor-$version-Windows-x64.zip"
+          if (-not (Test-Path -LiteralPath $archive -PathType Leaf)) {
+            throw "The verified archive name does not match Cargo version $version."
+          }
+
+          "version=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          "tag=v$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+
+      - name: Create or update GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_VERSION: ${{ steps.release-metadata.outputs.version }}
+          RELEASE_TAG: ${{ steps.release-metadata.outputs.tag }}
+        run: |
+          & git fetch --force --tags origin
+          if ($LASTEXITCODE -ne 0) {
+            throw 'Could not fetch release tags.'
+          }
+
+          $tagRef = "refs/tags/$env:RELEASE_TAG"
+          $tagCommitOutput = & git rev-parse --verify "$tagRef^{commit}" 2>$null
+          $tagExists = $LASTEXITCODE -eq 0
+          if ($tagExists) {
+            $tagCommit = ($tagCommitOutput | Select-Object -First 1).Trim()
+            if ($tagCommit -cne $env:GITHUB_SHA) {
+              throw "Tag $env:RELEASE_TAG already points to $tagCommit. Increment the version in Cargo.toml before publishing another release."
+            }
+          }
+
+          $assets = @(
+            'artifacts/codex-usage-monitor.exe',
+            'artifacts/codex-usage-monitor.exe.sha256',
+            "artifacts/CodexUsageMonitor-$env:RELEASE_VERSION-Windows-x64.zip",
+            "artifacts/CodexUsageMonitor-$env:RELEASE_VERSION-Windows-x64.zip.sha256"
+          )
+
+          & gh release view $env:RELEASE_TAG --repo $env:GITHUB_REPOSITORY *> $null
+          $releaseExists = $LASTEXITCODE -eq 0
+          if ($releaseExists) {
+            & gh release edit $env:RELEASE_TAG `
+              --repo $env:GITHUB_REPOSITORY `
+              --title "Codex Usage Monitor $env:RELEASE_TAG" `
+              --draft=false `
+              --prerelease=false
+            if ($LASTEXITCODE -ne 0) {
+              throw 'Could not update the GitHub Release.'
+            }
+
+            & gh release upload $env:RELEASE_TAG @assets `
+              --repo $env:GITHUB_REPOSITORY `
+              --clobber
+            if ($LASTEXITCODE -ne 0) {
+              throw 'Could not upload release assets.'
+            }
+          } else {
+            $arguments = @(
+              'release', 'create', $env:RELEASE_TAG
+            ) + $assets + @(
+              '--repo', $env:GITHUB_REPOSITORY,
+              '--generate-notes',
+              '--title', "Codex Usage Monitor $env:RELEASE_TAG"
+            )
+
+            if ($tagExists) {
+              $arguments += '--verify-tag'
+            } else {
+              $arguments += @('--target', $env:GITHUB_SHA)
+            }
+
+            & gh @arguments
+            if ($LASTEXITCODE -ne 0) {
+              throw 'Could not create the GitHub Release.'
+            }
+          }
+
+  publish-winget:
+    name: Submit WinGet manifest update
+    needs: publish-release
+    if: needs.publish-release.result == 'success'
+    runs-on: windows-2022
+    timeout-minutes: 15
+
+    permissions: {}
+
+    env:
+      PACKAGE_VERSION: ${{ needs.publish-release.outputs.version }}
+      RELEASE_TAG: ${{ needs.publish-release.outputs.tag }}
+
+    defaults:
+      run:
+        shell: pwsh
+
+    steps:
+      - name: Prepare WinGet release metadata
+        run: |
+          if ($env:PACKAGE_VERSION -notmatch '^\d+\.\d+\.\d+$') {
+            throw "Invalid WinGet package version: $env:PACKAGE_VERSION"
+          }
+          if ($env:RELEASE_TAG -cne "v$env:PACKAGE_VERSION") {
+            throw "Release tag $env:RELEASE_TAG does not match version $env:PACKAGE_VERSION."
+          }
+
+          $packageUrl = "https://github.com/$env:GITHUB_REPOSITORY/releases/download/$env:RELEASE_TAG/$env:RELEASE_ASSET_NAME"
+          "PACKAGE_URL=$packageUrl" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Detect WinGet credentials
+        env:
+          WINGET_TOKEN: ${{ secrets.WINGETCREATE_GITHUB_TOKEN }}
+        run: |
+          if ([string]::IsNullOrEmpty($env:WINGET_TOKEN)) {
+            Write-Warning 'Skipping WinGet submission because WINGETCREATE_GITHUB_TOKEN is not configured.'
+            'WINGET_TOKEN_CONFIGURED=false' | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          } else {
+            'WINGET_TOKEN_CONFIGURED=true' | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          }
+
+      - name: Check for an existing WinGet manifest
+        if: env.WINGET_TOKEN_CONFIGURED == 'true'
+        run: |
+          $manifestUrl = "https://raw.githubusercontent.com/microsoft/winget-pkgs/master/manifests/d/DarhangeR/CodexUsageMonitor/$env:PACKAGE_VERSION/DarhangeR.CodexUsageMonitor.yaml"
+          $response = Invoke-WebRequest -Uri $manifestUrl -Method Head -SkipHttpErrorCheck
+          if ($response.StatusCode -eq 200) {
+            Write-Warning "WinGet manifest $env:WINGET_PACKAGE_ID $env:PACKAGE_VERSION already exists; skipping a duplicate submission."
+            'WINGET_MANIFEST_EXISTS=true' | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          } elseif ($response.StatusCode -eq 404) {
+            'WINGET_MANIFEST_EXISTS=false' | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          } else {
+            throw "Unable to check the existing WinGet manifest (HTTP $($response.StatusCode))."
+          }
+
+      - name: Install .NET 6 runtime
+        if: env.WINGET_TOKEN_CONFIGURED == 'true' && env.WINGET_MANIFEST_EXISTS != 'true'
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: '6.0.x'
+
+      - name: Download WingetCreate
+        if: env.WINGET_TOKEN_CONFIGURED == 'true' && env.WINGET_MANIFEST_EXISTS != 'true'
+        run: Invoke-WebRequest https://aka.ms/wingetcreate/latest -OutFile wingetcreate.exe
+
+      - name: Submit WinGet manifest update
+        if: env.WINGET_TOKEN_CONFIGURED == 'true' && env.WINGET_MANIFEST_EXISTS != 'true'
+        env:
+          WINGET_CREATE_GITHUB_TOKEN: ${{ secrets.WINGETCREATE_GITHUB_TOKEN }}
+        run: |
+          & .\wingetcreate.exe update $env:WINGET_PACKAGE_ID `
+            --urls $env:PACKAGE_URL `
+            --version $env:PACKAGE_VERSION `
+            --submit `
+            --no-open
+          if ($LASTEXITCODE -ne 0) {
+            throw "WingetCreate failed with exit code $LASTEXITCODE."
+          }
