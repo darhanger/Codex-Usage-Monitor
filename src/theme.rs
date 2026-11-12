@@ -1,10 +1,25 @@
-use windows::core::PCWSTR;
+use serde::{Deserialize, Serialize};
+use windows::core::w;
 use windows::Win32::System::Registry::*;
 
-use crate::native_interop::wide_str;
+#[derive(Clone, Copy, Debug, Default, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum ThemeMode {
+    #[default]
+    System,
+    Light,
+    Dark,
+}
 
-const REGISTRY_PATH: &str = r"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize";
-const REGISTRY_KEY: &str = "SystemUsesLightTheme";
+impl ThemeMode {
+    pub fn resolve_dark(self, system_dark: bool) -> bool {
+        match self {
+            Self::System => system_dark,
+            Self::Light => false,
+            Self::Dark => true,
+        }
+    }
+}
 
 /// Check if the system is in dark mode by reading the registry
 pub fn is_dark_mode() -> bool {
@@ -13,27 +28,24 @@ pub fn is_dark_mode() -> bool {
 
 fn is_light_theme() -> bool {
     unsafe {
-        let path = wide_str(REGISTRY_PATH);
-        let key_name = wide_str(REGISTRY_KEY);
-
         let mut hkey = HKEY::default();
         let result = RegOpenKeyExW(
             HKEY_CURRENT_USER,
-            PCWSTR::from_raw(path.as_ptr()),
+            w!("Software\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize"),
             0,
             KEY_READ,
             &mut hkey,
         );
 
         if result.is_err() {
-            return false; // Default to dark mode
+            return true;
         }
 
         let mut data: u32 = 0;
         let mut data_size: u32 = std::mem::size_of::<u32>() as u32;
         let result = RegQueryValueExW(
             hkey,
-            PCWSTR::from_raw(key_name.as_ptr()),
+            w!("SystemUsesLightTheme"),
             None,
             None,
             Some(&mut data as *mut u32 as *mut u8),
@@ -43,7 +55,7 @@ fn is_light_theme() -> bool {
         let _ = RegCloseKey(hkey);
 
         if result.is_err() {
-            return false; // Default to dark mode
+            return true;
         }
 
         data == 1

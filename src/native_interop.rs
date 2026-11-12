@@ -1,6 +1,7 @@
 use windows::core::PCWSTR;
 use windows::Win32::Foundation::{BOOL, HWND, LPARAM, RECT};
 use windows::Win32::UI::Accessibility::{SetWinEventHook, UnhookWinEvent, HWINEVENTHOOK};
+use windows::Win32::UI::HiDpi::{AreDpiAwarenessContextsEqual, GetWindowDpiAwarenessContext};
 use windows::Win32::UI::Shell::{SHAppBarMessage, ABM_GETTASKBARPOS, APPBARDATA};
 use windows::Win32::UI::WindowsAndMessaging::*;
 
@@ -18,11 +19,13 @@ pub const TIMER_POLL: usize = 1;
 pub const TIMER_COUNTDOWN: usize = 2;
 pub const TIMER_RESET_POLL: usize = 3;
 pub const TIMER_UPDATE_CHECK: usize = 4;
+pub const TIMER_TASKBAR_GEOMETRY: usize = 5;
 
 // Custom messages
 pub const WM_APP: u32 = 0x8000;
 pub const WM_APP_USAGE_UPDATED: u32 = WM_APP + 1;
 pub const WM_APP_TRAY: u32 = WM_APP + 3;
+pub const WM_APP_TRAY_MOVED: u32 = WM_APP + 4;
 
 #[derive(Clone, Copy, Debug)]
 pub struct TaskbarWindow {
@@ -78,9 +81,16 @@ pub fn find_child_window(parent: HWND, class_name: &str) -> Option<HWND> {
     }
 }
 
-/// Get taskbar position via SHAppBarMessage
+/// Get the live taskbar rectangle, falling back to the shell appbar query.
 pub fn get_taskbar_rect(taskbar_hwnd: HWND) -> Option<RECT> {
     unsafe {
+        // The live window rectangle tracks Explorer's layout and auto-hide
+        // animation; ABM_GETTASKBARPOS can still describe its reserved edge.
+        if let Some(rect) = get_window_rect_safe(taskbar_hwnd) {
+            if rect.right > rect.left && rect.bottom > rect.top {
+                return Some(rect);
+            }
+        }
         let mut class_name = [0u16; 64];
         let len = GetClassNameW(taskbar_hwnd, &mut class_name);
         if len > 0 {
@@ -116,8 +126,19 @@ pub fn get_window_rect_safe(hwnd: HWND) -> Option<RECT> {
 }
 
 /// Embed our window as a child of the taskbar
-pub fn embed_in_taskbar(hwnd: HWND, taskbar_hwnd: HWND) {
+pub fn embed_in_taskbar(hwnd: HWND, taskbar_hwnd: HWND) -> bool {
     unsafe {
+        // A cross-process SetParent with mismatched DPI awareness can reset
+        // this process's DPI mode. Keep the independent popup in that case.
+        if !AreDpiAwarenessContextsEqual(
+            GetWindowDpiAwarenessContext(hwnd),
+            GetWindowDpiAwarenessContext(taskbar_hwnd),
+        )
+        .as_bool()
+        {
+            return false;
+        }
+
         // Preserve existing extended style, add tool window + no activate
         let ex_style = GetWindowLongW(hwnd, GWL_EXSTYLE);
         let _ = SetWindowLongW(
@@ -132,6 +153,14 @@ pub fn embed_in_taskbar(hwnd: HWND, taskbar_hwnd: HWND) {
         let _ = SetWindowLongW(hwnd, GWL_STYLE, new_style as i32);
 
         let _ = SetParent(hwnd, taskbar_hwnd);
+        // SetParent returns the *old* parent, which is NULL for our initial
+        // popup even on success; verify the new relationship explicitly.
+        if GetParent(hwnd).ok() != Some(taskbar_hwnd) {
+            let _ = SetWindowLongW(hwnd, GWL_STYLE, style as i32);
+            let _ = SetWindowLongW(hwnd, GWL_EXSTYLE, ex_style);
+            return false;
+        }
+        true
     }
 }
 

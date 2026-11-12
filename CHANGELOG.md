@@ -6,8 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-11-12
+
 ### Added
 
+- A native context menu with keyboard navigation and separate Models, Refresh interval, Settings, Theme, and Language pages.
+- System, light, and dark context-menu themes with a persistent setting.
+- Input-layout and taskbar-geometry diagnostics for investigating intermittent Windows shell issues.
 - Locked, repeatable Windows x64 Release builds on a fixed GitHub-hosted runner.
 - Automated formatting, Clippy, test, and Release-build checks for pushes, pull requests, and manual runs.
 - A verified portable package containing the executable, license, and synchronized English and Russian readmes.
@@ -20,13 +25,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Changed
 
+- The widget follows live taskbar and notification-area geometry, hiding when its full dimensions cannot fit.
 - CI and release packaging now use `Cargo.toml` metadata as the single version source.
 - Release publication preserves the raw `codex-usage-monitor.exe` asset required by the portable updater.
 - English and Russian project readmes now document matching installation, update, security, diagnostics, build, and release flows.
 
 ### Fixed
 
-- No application behavior fixes are recorded for this documentation and delivery update.
+- Constrained widget placement to the available taskbar area before the notification icons.
+- Skipped cross-process taskbar embedding when DPI awareness contexts differ.
 
 ### Security
 
@@ -35,3 +42,4 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - WinGet credentials are passed through WingetCreate's supported environment variable and are never written to command arguments or logs.
 
 [Unreleased]: https://github.com/darhanger/Codex-Usage-Monitor/commits/main
+[0.3.0]: https://github.com/darhanger/Codex-Usage-Monitor/releases/tag/v0.3.0

@@ -12,6 +12,7 @@
 | --- | --- |
 | `main.rs` | Process modes and startup hand-off |
 | `window.rs` | UI state, message loop, taskbar widget, menus, settings, timers, polling coordination, notifications, startup, and update coordination |
+| `menu_popup.rs` | Native popup menu pages, keyboard interaction, rendering, and placement |
 | `native_interop.rs` | Taskbar enumeration, Win32 child-window embedding, positioning, accessibility hooks, messages, timers, and shared color/string helpers |
 | `tray_icon.rs` | Dynamic provider badges, tooltips, shell registration, balloon notifications, and tray input |
 | `poller.rs` | Poll orchestration, Claude Code and Antigravity pollers, credential discovery, provider error model, formatting, and reset timing |
@@ -30,6 +31,16 @@ The main thread owns window creation, menus, drawing, timers, and message dispat
 The widget is initially a layered popup. `native_interop` enumerates `Shell_TrayWnd` and `Shell_SecondaryTrayWnd`, and `window` reparents the widget as a taskbar child. If embedding fails, the popup remains topmost. The saved `taskbar_index` and `tray_offset` restore placement. Drag calculations clamp the widget before the notification area and support moving it between taskbars.
 
 Rendering uses GDI into a 32-bit surface, then updates the layered window. Provider palettes, two quota rows, text, dimensions, and DPI scaling are calculated in `window.rs`. `theme.rs` reads `SystemUsesLightTheme`; theme and language changes cause repainting without restarting.
+
+The context menu is a separate top-level `WS_EX_TOOLWINDOW` popup in `menu_popup.rs`. It has no taskbar parent or browser runtime. Native owner-drawn button controls provide focus, keyboard input, and accessible names; a single popup navigates between Main, Models, Refresh interval, Settings, Theme, and Language pages. It closes on deactivation or Escape. Its rows are rebuilt from a read-only snapshot of Rust-owned state, and actions use the existing `WM_COMMAND` handlers. Checked controls include a localized selected marker in their accessible names. The old system menu remains available if popup creation fails.
+
+Popup placement uses the invocation cursor, the containing monitor's work area, taskbar edge, and the popup window's per-monitor DPI. Coordinates remain physical pixels until row dimensions are scaled from DIP. The menu uses no timer or background thread. Its HWND, font, child controls, and GDI regions are destroyed when it closes.
+
+### Menu architecture decision
+
+The native popup preserves the existing Win32 message loop and portable EXE while avoiding WebView2 startup and browser-process overhead. The widget stays in the existing native layered rendering path. Provider polling, credentials, updates, tray icons, settings, and the Explorer watchdog remain in Rust. The WebView2 option was not validated in an in-application proof of concept, so this decision does not claim evidence about its focus or performance on this application. The native popup still requires manual keyboard, screen-reader, DPI, and multi-monitor validation on Windows 10 and 11; see `docs/MENU_WINDOWS_VALIDATION.md`.
+
+The widget is shown only when the live taskbar and `TrayNotifyWnd` rectangles leave room for its full width and height. Its invariant is `taskbar.left <= widget.left` and `widget.right <= tray.left`. The notification-area location hook triggers immediate reconciliation, and a five-second timer checks stable geometry as a fallback (one second while geometry is unavailable). Unsupported vertical taskbar geometry hides the widget instead of placing it across shell controls. A cross-process `SetParent` is skipped when DPI awareness contexts differ. The Ukrainian input-layout regression has not been reproduced or proven fixed; `--diagnose` and `scripts/check-input-languages.ps1` distinguish loaded-layout changes from a shell visibility problem.
 
 A dedicated watchdog checks taskbar handles every two seconds. Explorer destroys an embedded child window during a shell restart, so the watchdog relaunches a fresh process with bounded storm protection. The relaunch waits for the previous single-instance mutex before taking ownership.
 

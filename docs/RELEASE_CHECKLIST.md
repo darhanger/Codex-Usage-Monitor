@@ -6,7 +6,7 @@ Use this checklist for every public version. `Cargo.toml` is the only version so
 
 - [ ] Pull the current `main` branch and confirm the worktree contains no unrelated changes.
 - [ ] Set the next `MAJOR.MINOR.PATCH` version in `Cargo.toml`.
-- [ ] Run `cargo metadata --no-deps --format-version 1` once to refresh the root package entry in `Cargo.lock`, then review that lockfile change.
+- [ ] Run `cargo update --workspace --offline` to refresh the root package entry in `Cargo.lock` without updating dependencies, then review that lockfile change.
 - [ ] Run `cargo metadata --no-deps --locked --format-version 1` and confirm the root package version.
 - [ ] Update `CHANGELOG.md` without inventing unverified release history.
 - [ ] Synchronize `README.md` and `README_RU.md`.

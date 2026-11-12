@@ -20,6 +20,7 @@ The file is created when a persistent menu option or position changes. Close the
 | `taskbar_index` | non-negative integer | `0` | Taskbar index after stable screen-position sorting |
 | `poll_interval_ms` | non-negative integer | `900000` | Normal provider polling interval in milliseconds |
 | `language` | string or `null` | `null` | Explicit language code; `null` uses Windows language detection |
+| `theme` | `system`, `light`, or `dark` | `system` | Context menu theme; `system` follows the Windows taskbar theme |
 | `last_update_check_unix` | integer or `null` | `null` | Last completed update-check time in Unix seconds |
 | `widget_visible` | boolean | `true` | Saved widget visibility |
 | `show_claude_code` | boolean | `false` | Show and poll Claude Code |
@@ -38,6 +39,7 @@ Right-click the widget or any provider tray badge.
 - **Settings > Start with Windows** updates `HKCU\Software\Microsoft\Windows\CurrentVersion\Run\CodexUsageMonitor` with the current executable path.
 - **Settings > Reset position** returns the widget to the default taskbar offset.
 - **Settings > Language** uses the Windows default or an explicit supported language.
+- **Settings > Theme** selects the system, light, or dark context menu theme.
 - The version entry checks for updates, applies an available portable update, or delegates to WinGet for a WinGet installation.
 - **Show widget** changes persisted visibility. A tray icon remains available while the widget is hidden.
 
@@ -86,7 +88,7 @@ The configured interval controls normal provider polls. Polls execute off the UI
 
 The selected taskbar and offset are persisted. Taskbars are enumerated by screen position; changing monitor topology can therefore change which physical display corresponds to an old index. Use **Reset position** or drag the widget again after a topology change.
 
-The widget tracks per-monitor DPI. Theme colors follow `HKCU\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize\SystemUsesLightTheme`; there is no independent application theme setting.
+The widget tracks per-monitor DPI. Its colors follow `HKCU\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize\SystemUsesLightTheme` without restarting, and its background stays transparent. The `theme` setting controls only the context menu. In `system` mode, the menu follows the same Windows setting; explicit light or dark choices affect the menu independently. The menu retains native Windows interaction while drawing its items in a matching palette.
 
 Start with Windows is enabled only when the registry value exactly matches the current executable. Moving a portable EXE intentionally makes the old value appear disabled until the option is enabled again from the new location.
 

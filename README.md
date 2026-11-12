@@ -29,7 +29,7 @@ A lightweight native Windows taskbar widget for **Codex**, **Claude Code**, and 
 - One-click refresh, configurable polling, provider selection, and 11 UI languages.
 - Drag placement on primary and secondary taskbars.
 - Automatic recovery after Windows Explorer restarts.
-- Per-monitor DPI handling and Windows light/dark taskbar colors.
+- Per-monitor DPI handling, a transparent widget that follows taskbar colors, and system, light, or dark menu themes.
 - Single-instance operation and optional start with Windows.
 - Portable self-update and WinGet-aware update handling.
 - Opt-in diagnostic logging with no analytics or telemetry.
@@ -98,6 +98,7 @@ Only one instance runs at a time. If the taskbar cannot accept the embedded chil
 - Select **Refresh** for an immediate poll and to repeat a relevant authentication notification.
 - Select **Models** to enable or disable provider columns. At least one remains enabled.
 - Choose a polling interval of 1 minute, 5 minutes, 15 minutes, or 1 hour.
+- Choose **Settings > Theme** to follow Windows or use a light or dark context menu.
 - Reset the saved taskbar position from **Settings**.
 - Use the version entry in **Settings** to check for or apply an update.
 
@@ -131,7 +132,7 @@ Providers are polled independently at the error-model level. A failure in one en
 
 ## Configuration
 
-The menu controls provider visibility, poll interval, widget visibility and position, language, startup, and updates. UI settings are stored at:
+The menu controls provider visibility, poll interval, widget visibility and position, theme, language, startup, and updates. UI settings are stored at:
 
 ```text
 %APPDATA%\CodexUsageMonitor\settings.json

@@ -3,6 +3,7 @@
 mod codex_poller;
 mod diagnose;
 mod localization;
+mod menu_popup;
 mod models;
 mod native_interop;
 mod poller;
